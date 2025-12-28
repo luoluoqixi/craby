@@ -124,7 +124,9 @@ pub fn run() -> Result<()> {
 
     // Crates
     update_cargo_workspace_version(&version)?;
-    publish_crates()?;
+    if let Err(e) = publish_crates() {
+        println!("Error publishing crates: {}", e);
+    }
 
     // NPM
     setup_npm()?;

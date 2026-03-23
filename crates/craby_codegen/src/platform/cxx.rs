@@ -290,6 +290,9 @@ impl Method {
         let mut args = Vec::with_capacity(self.params.len() + 1);
         // ["auto arg0 = facebook::react::bridging::fromJs<T>(rt, value, callInvoker)", "..."]
         let mut args_decls = Vec::with_capacity(self.params.len());
+        // Track string arg names: async lambdas must capture `arg$raw` (std::string) instead of
+        // `arg` (rust::Str) to avoid dangling pointers after the outer scope is destroyed.
+        let mut string_args: Vec<String> = Vec::new();
 
         for (idx, param) in self.params.iter().enumerate() {
             let arg_ref = cxx_arg_ref(idx);
@@ -302,6 +305,8 @@ impl Method {
                 let str_var = format!("{arg_var}$raw");
                 args_decls.push(format!("auto {str_var} = {arg_ref}.asString(rt).utf8(rt);",));
 
+                string_args.push(arg_var.clone());
+
                 // Convert the `std::string` to `rust::Str`
                 format!("rust::Str({str_var}.data(), {str_var}.size())")
             } else {
@@ -313,10 +318,29 @@ impl Method {
 
         let invoke_stmts = match &self.ret_type {
             TypeAnnotation::Promise(resolve_type) => {
+                // For async functions, the outer-scope `auto arg0 = rust::Str(...)` declarations
+                // for string args are unnecessary: they are not captured by the lambda and would
+                // shadow the inner declarations reconstructed from `arg0$raw` inside the lambda.
+                // Remove them from the outer scope so the generated code stays clean.
+                for arg in &string_args {
+                    let str_var = format!("{arg}$raw");
+                    let decl = format!("auto {arg} = rust::Str({str_var}.data(), {str_var}.size());");
+                    args_decls.retain(|d| d != &decl);
+                }
+
                 let mut bind_args = Vec::with_capacity(args.len() + 2);
                 bind_args.push(RESERVED_ARG_NAME_MODULE.to_string());
                 bind_args.push("promise".to_string());
-                bind_args.extend(args.clone());
+                // For string args, capture `arg$raw` (std::string) instead of `arg` (rust::Str).
+                // rust::Str is a non-owning reference; if arg$raw is destroyed before the lambda
+                // executes, arg becomes a dangling pointer with garbage bytes.
+                for arg in &args {
+                    if string_args.contains(arg) {
+                        bind_args.push(format!("{arg}$raw"));
+                    } else {
+                        bind_args.push(arg.clone());
+                    }
+                }
 
                 args.insert(0, format!("*{}", RESERVED_ARG_NAME_MODULE));
                 let fn_args = args.join(", ");
@@ -337,8 +361,13 @@ impl Method {
                     }
                 };
 
+                // Reconstruct rust::Str from the captured std::string inside the lambda.
+                let inner_str_decls: String = string_args
+                    .iter()
+                    .map(|arg| format!("auto {arg} = rust::Str({arg}$raw.data(), {arg}$raw.size());\n"))
+                    .collect();
                 let bind_args = bind_args.join(", ");
-                let ret_stmts = indent_str(&ret_stmts, 4);
+                let ret_stmts = indent_str(&format!("{inner_str_decls}{ret_stmts}"), 4);
                 let ret_type = if let TypeAnnotation::Void = &**resolve_type {
                     "std::monostate".to_string()
                 } else {

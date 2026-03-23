@@ -15,8 +15,8 @@ use craby_codegen::{
     },
     types::CodegenContext,
 };
-use craby_common::{config::load_config, constants::craby_tmp_dir, env::is_initialized};
-use log::{debug, info};
+use craby_common::{config::load_config, constants::{crate_dir, craby_tmp_dir, impl_mod_name}, env::is_initialized};
+use log::{debug, info, warn};
 use owo_colors::OwoColorize;
 
 use crate::utils::{file::write_file, schema::print_schema};
@@ -134,12 +134,36 @@ pub fn perform(opts: CodegenOptions) -> anyhow::Result<()> {
         }
     }
 
+    check_lib_rs_mods(&ctx);
+
     info!(
         "Codegen completed successfully 🎉 {}",
         format!("({}ms)", elapsed).dimmed()
     );
 
     Ok(())
+}
+
+/// Checks `lib.rs` for missing `mod <impl>` declarations.
+///
+/// Since `lib.rs` is never overwritten (to preserve user code), adding a new
+/// craby module won't be reflected automatically. This function warns when an
+/// expected `mod <name>_impl;` is absent from the file.
+fn check_lib_rs_mods(ctx: &CodegenContext) {
+    let lib_rs_path = crate_dir(&ctx.root).join("src").join("lib.rs");
+
+    let content = match std::fs::read_to_string(&lib_rs_path) {
+        Ok(c) => c,
+        Err(_) => return,
+    };
+
+    for mod_name in ctx.schemas.iter().map(|s| impl_mod_name(&s.module_name)) {
+        if !content.contains(&format!("mod {mod_name}")) {
+            warn!(
+                "lib.rs is missing module declaration: `pub(crate) mod {mod_name};`\n  → Add it manually or delete lib.rs to regenerate."
+            );
+        }
+    }
 }
 
 fn with_generated_comment(path: &Path, code: &str) -> String {

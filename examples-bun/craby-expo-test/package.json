@@ -2,6 +2,9 @@
   "name": "craby-expo-test",
   "main": "expo-router/entry",
   "version": "1.0.0",
+  "workspaces": [
+    "craby_module_test"
+  ],
   "scripts": {
     "start": "expo start --dev-client",
     "android": "expo run:android",
@@ -16,6 +19,7 @@
     "@react-navigation/bottom-tabs": "^7.15.10",
     "@react-navigation/elements": "^2.9.15",
     "@react-navigation/native": "^7.2.2",
+    "craby_module_test": "workspace:*",
     "expo": "~55.0.17",
     "expo-constants": "~55.0.15",
     "expo-device": "~55.0.15",

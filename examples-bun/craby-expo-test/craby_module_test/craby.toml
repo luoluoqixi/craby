@@ -9,7 +9,12 @@ package_name = "rs.craby.crabymoduletest"
 # armv7-linux-androideabi
 # x86_64-linux-android
 # i686-linux-android
-targets = ["aarch64-linux-android"]
+targets = [
+    "aarch64-linux-android",
+    "armv7-linux-androideabi",
+    "x86_64-linux-android",
+    "i686-linux-android",
+]
 
 [ios]
 

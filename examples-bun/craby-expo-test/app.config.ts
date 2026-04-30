@@ -2,12 +2,12 @@ import { type ConfigContext, type ExpoConfig } from "expo/config";
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
-  name: "lonanote",
-  slug: "lonanote",
+  name: "craby-expo-test",
+  slug: "craby-expo-test",
   version: "1.0.0",
   orientation: "portrait",
   icon: "./assets/images/icon.png",
-  scheme: "lonanote",
+  scheme: "crabyexpotest",
   userInterfaceStyle: "automatic",
   ios: {
     supportsTablet: true,
@@ -21,7 +21,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       monochromeImage: "./assets/images/android-icon-monochrome.png",
     },
     predictiveBackGestureEnabled: false,
-    package: "com.anonymous.lonanote",
+    package: "com.anonymous.crabyexpotest",
   },
   web: {
     output: "static",
